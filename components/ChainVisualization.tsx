@@ -12,9 +12,8 @@ export default function ChainVisualization({ result }: Props) {
   const [visibleLinks, setVisibleLinks] = useState(0);
   const { chain, degrees, player, target } = result;
 
-  // Animate links one by one
+  // Animate links one by one — state resets via key prop remount on new result
   useEffect(() => {
-    setVisibleLinks(0);
     const total = chain.length + 1; // +1 for final target node
     const interval = setInterval(() => {
       setVisibleLinks((v) => {
@@ -26,7 +25,7 @@ export default function ChainVisualization({ result }: Props) {
       });
     }, 380);
     return () => clearInterval(interval);
-  }, [result, chain.length]);
+  }, [chain.length]);
 
   if (degrees === 0) {
     return (

@@ -1,6 +1,5 @@
 {
-  "/api/search/route": "app/api/search/route.js",
+  "/dashboard/page": "app/dashboard/page.js",
   "/page": "app/page.js",
-  "/six-degrees/page": "app/six-degrees/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/six-degrees/page": "app/six-degrees/page.js"
 }

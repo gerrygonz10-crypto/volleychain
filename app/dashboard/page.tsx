@@ -42,6 +42,7 @@ function DashboardContent() {
   useEffect(() => {
     const slug = params.get("player");
     if (slug && !player) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadDashboard({ id: slug, name: slug, slug, is_pro: false, created_at: "" });
     }
   }, [params, player, loadDashboard]);

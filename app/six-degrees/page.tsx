@@ -33,6 +33,7 @@ function SixDegreesContent() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [targetPro, setTargetPro] = useState<string>(TOP_PROS[0]);
   const [result, setResult] = useState<ChainResult | null>(null);
+  const [chainKey, setChainKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
@@ -51,6 +52,7 @@ function SixDegreesContent() {
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setResult(data.result ?? null);
+      setChainKey((k) => k + 1);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to find chain");
     } finally {
@@ -62,6 +64,7 @@ function SixDegreesContent() {
   useEffect(() => {
     const slug = params.get("player");
     if (slug && !player) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       findChain({ id: slug, name: slug, slug, is_pro: false, created_at: "" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,7 +135,7 @@ function SixDegreesContent() {
       )}
 
       {result && !loading && (
-        <ChainVisualization result={result} />
+        <ChainVisualization key={chainKey} result={result} />
       )}
 
       {searched && !loading && !error && !result && (
