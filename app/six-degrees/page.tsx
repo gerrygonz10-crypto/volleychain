@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PlayerSearch from "@/components/PlayerSearch";
 import ChainVisualization from "@/components/ChainVisualization";
@@ -21,6 +21,14 @@ const TOP_PROS = [
 ];
 
 export default function SixDegreesPage() {
+  return (
+    <Suspense>
+      <SixDegreesContent />
+    </Suspense>
+  );
+}
+
+function SixDegreesContent() {
   const params = useSearchParams();
   const [player, setPlayer] = useState<Player | null>(null);
   const [targetPro, setTargetPro] = useState<string>(TOP_PROS[0]);
