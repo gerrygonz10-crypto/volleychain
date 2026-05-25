@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const opponentStubs = [
       ...new Map(
         matches.flatMap((m) => {
-          const stubs = [];
+          const stubs: [string, { id: string; name: string; slug: string; is_pro: boolean; created_at: string }][] = [];
           if (m.winner_id !== player.id) {
             stubs.push([
               m.winner_id,
