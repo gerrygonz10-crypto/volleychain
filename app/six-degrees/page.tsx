@@ -1,0 +1,148 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import PlayerSearch from "@/components/PlayerSearch";
+import ChainVisualization from "@/components/ChainVisualization";
+import type { Player, ChainResult } from "@/types";
+
+// Well-known top AVP pros
+const TOP_PROS = [
+  "Phil Dalhausser",
+  "Nick Lucena",
+  "Taylor Crabb",
+  "Jake Gibb",
+  "Reid Priddy",
+  "Trevor Crabb",
+  "Tri Bourne",
+  "Casey Patterson",
+  "Sean Rosenthal",
+  "John Hyden",
+];
+
+export default function SixDegreesPage() {
+  const params = useSearchParams();
+  const [player, setPlayer] = useState<Player | null>(null);
+  const [targetPro, setTargetPro] = useState<string>(TOP_PROS[0]);
+  const [result, setResult] = useState<ChainResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searched, setSearched] = useState(false);
+
+  const findChain = async (p: Player) => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setSearched(true);
+    setPlayer(p);
+
+    try {
+      const res = await fetch(
+        `/api/six-degrees?player=${p.slug}&target=${encodeURIComponent(targetPro)}`
+      );
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setResult(data.result ?? null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to find chain");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-load from URL
+  useEffect(() => {
+    const slug = params.get("player");
+    if (slug && !player) {
+      findChain({ id: slug, name: slug, slug, is_pro: false, created_at: "" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-10">
+      <h1 className="text-3xl font-bold text-sand-100 mb-1">Six Degrees</h1>
+      <p className="text-court-400 mb-8 text-sm">
+        Trace the shortest chain of wins connecting any player to a top AVP pro
+      </p>
+
+      <div className="card p-6 mb-8">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <label className="block text-sand-400 text-xs uppercase tracking-wider mb-2">
+              Starting Player
+            </label>
+            <PlayerSearch
+              onSelect={findChain}
+              placeholder="Search player..."
+              initialSlug={params.get("player") ?? undefined}
+            />
+          </div>
+
+          <div className="md:w-64">
+            <label className="block text-sand-400 text-xs uppercase tracking-wider mb-2">
+              Target Pro
+            </label>
+            <select
+              value={targetPro}
+              onChange={(e) => setTargetPro(e.target.value)}
+              className="input-field"
+            >
+              {TOP_PROS.map((pro) => (
+                <option key={pro} value={pro}>
+                  {pro}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-end">
+            <button
+              onClick={() => player && findChain(player)}
+              disabled={!player || loading}
+              className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              {loading ? "Searching..." : "Find Chain"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="card p-12 text-center">
+          <div className="inline-flex items-center gap-3 text-gold-400">
+            <div className="w-5 h-5 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
+            <span>Tracing the chain...</span>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="card p-6 text-red-400 text-sm border-red-900/50">
+          {error}
+        </div>
+      )}
+
+      {result && !loading && (
+        <ChainVisualization result={result} />
+      )}
+
+      {searched && !loading && !error && !result && (
+        <div className="card p-10 text-center">
+          <div className="text-4xl mb-4">🏐</div>
+          <div className="text-sand-300 font-medium mb-2">No chain found</div>
+          <p className="text-court-400 text-sm">
+            No win path could be traced to {targetPro}.<br />
+            Try more tournament data or a different target pro.
+          </p>
+        </div>
+      )}
+
+      {!player && !loading && !searched && (
+        <div className="card p-10 text-center text-court-400">
+          Search for a player above to find their chain.
+        </div>
+      )}
+    </div>
+  );
+}

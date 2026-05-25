@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --yes)",
+      "Bash(export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\")",
+      "Read(//Users/gerrygonzalez/.nvm/versions/**)",
+      "Read(//Users/gerrygonzalez/.volta/**)",
+      "Read(//usr/**)",
+      "Read(//opt/**)",
+      "Bash(echo $PATH)",
+      "Read(//Users/gerrygonzalez/**)",
+      "Read(//Users/gerrygonzalez/Library/**)",
+      "Read(//Users/gerrygonzalez/.local/**)",
+      "Read(//System/Volumes/Data/home/**)",
+      "Read(//Applications/**)",
+      "Bash(curl --version)"
+    ]
+  }
+}
