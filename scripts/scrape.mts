@@ -1,9 +1,10 @@
 /**
  * CLI scraper script
- * Usage: npm run scrape -- --slug player-slug
+ * Usage: npm run scrape -- --slug player-id
  *        npm run scrape -- --query "John Smith"
  */
 
+import "./load-env.mjs"; // must be first — loads .env.local before supabase initializes
 import { scrapePlayerMatches, searchPlayers } from "@/lib/scraper";
 import { createServiceClient } from "@/lib/supabase";
 import type { Player } from "@/types";

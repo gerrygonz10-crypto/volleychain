@@ -1,150 +1,205 @@
-/**
- * volleyballlife.com scraper
- *
- * Pulls tournament match results from public player profile pages.
- * Rate-limited to be respectful of the server.
- */
-
-import axios from "axios";
-import * as cheerio from "cheerio";
 import type { Player, Match } from "@/types";
 
-const BASE_URL = "https://www.volleyballlife.com";
+const API_BASE = "https://api-v8.volleyballlife.com";
 const DELAY = Number(process.env.SCRAPE_DELAY_MS ?? 1500);
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchPage(url: string): Promise<string> {
-  const res = await axios.get(url, {
+async function apiGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
     headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; VolleyChain-Bot/1.0; +https://github.com/volleychain)",
-      Accept: "text/html,application/xhtml+xml",
+      "User-Agent": "Mozilla/5.0 (compatible; VolleyChain-Bot/1.0)",
+      Accept: "application/json",
     },
-    timeout: 15_000,
+    signal: AbortSignal.timeout(15_000),
   });
-  return res.data as string;
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${path}`);
+  return res.json() as Promise<T>;
 }
 
-/** Search for players by name on volleyballlife.com */
+// ---- API response shapes ----
+
+interface VBLFinish {
+  id: number;    // tournament ID
+  tdId: number;  // division ID — key for hydrate calls (only in main profile endpoint)
+  tournament: string;
+  date: string;
+  division: string;
+  finish: number;
+}
+
+// Main profile endpoint — has tdId on each tournament entry
+interface VBLProfileResponse {
+  id: number;
+  firstName: string;
+  lastName: string;
+  tournaments: VBLFinish[];
+}
+
+interface VBLTeamPlayer {
+  playerProfileId: number;
+  name: string;
+}
+
+interface VBLTeam {
+  id: number;
+  players: VBLTeamPlayer[];
+}
+
+interface VBLGame {
+  home: number;
+  away: number;
+}
+
+interface VBLMatchTeam {
+  teamId: number;
+}
+
+interface VBLMatch {
+  id: number;
+  isWinners: boolean;
+  round: number;
+  games: VBLGame[];
+  homeTeam?: VBLMatchTeam;
+  awayTeam?: VBLMatchTeam;
+}
+
+interface VBLDivision {
+  teams: VBLTeam[];
+  days: Array<{
+    pools: Array<{ matches: VBLMatch[] }>;
+    brackets: Array<{ matches: VBLMatch[] }>;
+  }>;
+}
+
+interface VBLSearchResult {
+  id: number;
+  firstName: string;
+  lastName: string;
+}
+
+// ---- public API ----
+
 export async function searchPlayers(query: string): Promise<Player[]> {
-  const url = `${BASE_URL}/search?q=${encodeURIComponent(query)}&type=player`;
-  const html = await fetchPage(url);
-  const $ = cheerio.load(html);
-
-  const players: Player[] = [];
-
-  // Selector based on volleyballlife.com search results markup
-  $(".player-result, .search-result-player, [data-player-id]").each(
-    (_, el) => {
-      const $el = $(el);
-      const name =
-        $el.find(".player-name, .name").text().trim() ||
-        $el.attr("data-player-name") ||
-        "";
-      const href =
-        $el.find("a").first().attr("href") || $el.attr("data-href") || "";
-      const slug = href.split("/").filter(Boolean).pop() || "";
-      const id = $el.attr("data-player-id") || slug;
-
-      if (name && slug) {
-        players.push({
-          id,
-          name,
-          slug,
-          is_pro: false,
-          created_at: new Date().toISOString(),
-        });
-      }
-    }
+  const results = await apiGet<VBLSearchResult[]>(
+    `/playerprofile/search/${encodeURIComponent(query)}`
   );
-
-  return players;
+  return (results || []).map((p) => ({
+    id: String(p.id),
+    name: `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim(),
+    slug: String(p.id),
+    is_pro: false,
+    created_at: new Date().toISOString(),
+  }));
 }
 
-/** Scrape all matches for a player from their profile page */
 export async function scrapePlayerMatches(
-  playerSlug: string
+  slug: string
 ): Promise<{ player: Player; matches: Match[] }> {
-  const url = `${BASE_URL}/players/${playerSlug}/results`;
-  const html = await fetchPage(url);
-  const $ = cheerio.load(html);
-
-  // Extract player info
-  const playerName =
-    $("h1.player-name, .profile-name, [itemprop=name]").first().text().trim() ||
-    playerSlug;
-  const playerId =
-    $("[data-player-id]").first().attr("data-player-id") || playerSlug;
+  // Main profile endpoint has tdId (division ID) on every tournament entry
+  const profile = await apiGet<VBLProfileResponse>(`/playerprofile/${slug}`);
 
   const player: Player = {
-    id: playerId,
-    name: playerName,
-    slug: playerSlug,
+    id: String(profile.id),
+    name: `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim(),
+    slug: String(profile.id),
     is_pro: false,
     created_at: new Date().toISOString(),
   };
 
   const matches: Match[] = [];
+  const seenMatchIds = new Set<string>();
+  const seenDivisions = new Set<number>();
 
-  // Parse match rows — volleyballlife uses a table or card layout per tournament
-  $(".tournament-results, .results-table, .match-row").each((_, tournEl) => {
-    const $tourn = $(tournEl);
-    const tournamentName =
-      $tourn.find(".tournament-name, .event-name").text().trim();
-    const tournamentDate =
-      $tourn.find(".tournament-date, .event-date").text().trim();
-    const tournamentId = slugify(`${tournamentName}-${tournamentDate}`);
+  for (const finish of profile.tournaments ?? []) {
+    if (!finish.tdId || seenDivisions.has(finish.tdId)) continue;
+    seenDivisions.add(finish.tdId);
 
-    $tourn.find(".match, tr.match-row, [data-match]").each((_, matchEl) => {
-      const $m = $(matchEl);
-      const opponentName = $m
-        .find(".opponent-name, .opponent, td.opponent")
-        .text()
-        .trim();
-      const opponentSlug = (
-        $m.find("a[href*='/players/']").attr("href") || ""
-      )
-        .split("/")
-        .filter(Boolean)
-        .pop() || slugify(opponentName);
-      const score = $m.find(".score, .match-score, td.score").text().trim();
-      const resultText = $m
-        .find(".result, .win-loss, td.result")
-        .text()
-        .trim()
-        .toLowerCase();
-      const round = $m.find(".round, td.round").text().trim();
+    await sleep(DELAY);
 
-      if (!opponentName) return;
+    let divData: VBLDivision;
+    try {
+      divData = await apiGet<VBLDivision>(`/division/${finish.tdId}/hydrate`);
+    } catch {
+      console.warn(`  Skipping division ${finish.tdId}: fetch failed`);
+      continue;
+    }
 
-      const isWin = resultText.startsWith("w") || resultText === "win";
-      const matchId = slugify(
-        `${tournamentId}-${playerSlug}-${opponentSlug}-${round}`
-      );
+    // teamId → individual players
+    const teamPlayers = new Map<number, VBLTeamPlayer[]>();
+    for (const team of divData.teams ?? []) {
+      teamPlayers.set(team.id, team.players ?? []);
+    }
 
-      matches.push({
-        id: matchId,
-        tournament_id: tournamentId,
-        tournament_name: tournamentName,
-        tournament_date: normalizeDateString(tournamentDate),
-        round,
-        winner_id: isWin ? playerId : opponentSlug,
-        loser_id: isWin ? opponentSlug : playerId,
-        winner_name: isWin ? playerName : opponentName,
-        loser_name: isWin ? opponentName : playerName,
-        score,
-        created_at: new Date().toISOString(),
-      });
-    });
-  });
+    // collect matches from both pool play and bracket play
+    const rawMatches: VBLMatch[] = [];
+    for (const day of divData.days ?? []) {
+      for (const pool of day.pools ?? []) rawMatches.push(...(pool.matches ?? []));
+      for (const bracket of day.brackets ?? []) rawMatches.push(...(bracket.matches ?? []));
+    }
+
+    for (const m of rawMatches) {
+      if (!m.homeTeam || !m.awayTeam || !m.games?.length) continue;
+
+      // Determine winner by counting game wins
+      let homeGames = 0;
+      let awayGames = 0;
+      for (const g of m.games) {
+        if (g.home > g.away) homeGames++;
+        else if (g.away > g.home) awayGames++;
+      }
+      if (homeGames === 0 && awayGames === 0) continue; // no scores recorded
+
+      const homeWon = homeGames >= awayGames;
+      const winnerTeamId = homeWon ? m.homeTeam.teamId : m.awayTeam.teamId;
+      const loserTeamId = homeWon ? m.awayTeam.teamId : m.homeTeam.teamId;
+
+      const winnerPlayers = teamPlayers.get(winnerTeamId) ?? [];
+      const loserPlayers = teamPlayers.get(loserTeamId) ?? [];
+      if (!winnerPlayers.length || !loserPlayers.length) continue;
+
+      const score = m.games
+        .map((g) => (homeWon ? `${g.home}-${g.away}` : `${g.away}-${g.home}`))
+        .join(", ");
+
+      const roundName = m.isWinners
+        ? `Winners R${m.round + 1}`
+        : `Losers R${m.round + 1}`;
+
+      // one record per (winner player, loser player) pair — enables individual H2H + six degrees
+      for (const wp of winnerPlayers) {
+        for (const lp of loserPlayers) {
+          const matchId = `${finish.tdId}-${m.id}-${wp.playerProfileId}-${lp.playerProfileId}`;
+          if (seenMatchIds.has(matchId)) continue;
+          seenMatchIds.add(matchId);
+
+          matches.push({
+            id: matchId,
+            tournament_id: String(finish.id),
+            tournament_name: finish.tournament,
+            tournament_date: finish.date.split("T")[0],
+            round: roundName,
+            winner_id: String(wp.playerProfileId),
+            loser_id: String(lp.playerProfileId),
+            winner_name: wp.name,
+            loser_name: lp.name,
+            score,
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    console.log(
+      `  Division ${finish.tdId} (${finish.tournament} – ${finish.division}): ${rawMatches.length} matches processed`
+    );
+  }
 
   return { player, matches };
 }
 
-/** Scrape multiple players with rate limiting */
 export async function scrapeMultiplePlayers(
   slugs: string[]
 ): Promise<{ players: Player[]; matches: Match[] }> {
@@ -156,35 +211,18 @@ export async function scrapeMultiplePlayers(
     try {
       const { player, matches } = await scrapePlayerMatches(slug);
       allPlayers.push(player);
-
       for (const m of matches) {
         if (!seen.has(m.id)) {
           seen.add(m.id);
           allMatches.push(m);
         }
       }
-
-      console.log(`Scraped ${slug}: ${matches.length} matches`);
+      console.log(`Scraped ${slug}: ${matches.length} match records`);
     } catch (err) {
       console.error(`Failed to scrape ${slug}:`, err);
     }
-
     await sleep(DELAY);
   }
 
   return { players: allPlayers, matches: allMatches };
-}
-
-// ---- helpers ----
-
-function slugify(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
-function normalizeDateString(raw: string): string {
-  const d = new Date(raw);
-  return isNaN(d.getTime()) ? raw : d.toISOString().split("T")[0];
 }
