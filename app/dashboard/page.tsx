@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PlayerSearch from "@/components/PlayerSearch";
 import HeadToHeadCard from "@/components/HeadToHeadCard";
 import type { Player, HeadToHeadRecord } from "@/types";
 
 export default function DashboardPage() {
+  return (
+    <Suspense>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const params = useSearchParams();
   const [player, setPlayer] = useState<Player | null>(null);
   const [records, setRecords] = useState<HeadToHeadRecord[]>([]);
