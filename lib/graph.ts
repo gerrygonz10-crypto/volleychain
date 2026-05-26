@@ -16,8 +16,14 @@ interface MatchGraph {
 export function buildGraph(players: Player[], matches: Match[]): MatchGraph {
   const edges = new Map<string, Array<{ loserId: string; match: Match }>>();
   const playerMap = new Map<string, Player>(players.map((p) => [p.id, p]));
+  // One edge per (winner, loser) pair — duplicates across tournaments are redundant for BFS.
+  const seen = new Set<string>();
 
   for (const match of matches) {
+    const key = `${match.winner_id}:${match.loser_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
     if (!edges.has(match.winner_id)) {
       edges.set(match.winner_id, []);
     }
@@ -54,11 +60,15 @@ export function findShortestChain(
 
     for (const { loserId, match } of neighbors) {
       if (visited.has(loserId)) continue;
-      visited.add(loserId);
 
       const winner = graph.players.get(match.winner_id);
       const loser = graph.players.get(match.loser_id);
       if (!winner || !loser) continue;
+
+      // Mark visited only after confirming player data exists — marking before
+      // the null check would permanently lock out the node if this edge's
+      // player records are missing, causing BFS to take longer paths.
+      visited.add(loserId);
 
       const newPath: ChainLink[] = [...path, { winner, loser, match }];
 

@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from("matches")
       .select("*")
+      .order("id")
       .range(offset, offset + PAGE_SIZE - 1);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!data || data.length === 0) break;
