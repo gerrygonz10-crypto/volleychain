@@ -6,20 +6,6 @@ import PlayerSearch from "@/components/PlayerSearch";
 import ChainVisualization from "@/components/ChainVisualization";
 import type { Player, ChainResult } from "@/types";
 
-// Well-known top AVP pros
-const TOP_PROS = [
-  "Phil Dalhausser",
-  "Nick Lucena",
-  "Taylor Crabb",
-  "Jake Gibb",
-  "Reid Priddy",
-  "Trevor Crabb",
-  "Tri Bourne",
-  "Casey Patterson",
-  "Sean Rosenthal",
-  "John Hyden",
-];
-
 export default function SixDegreesPage() {
   return (
     <Suspense>
@@ -31,7 +17,6 @@ export default function SixDegreesPage() {
 function SixDegreesContent() {
   const params = useSearchParams();
   const [player, setPlayer] = useState<Player | null>(null);
-  const [targetPro, setTargetPro] = useState<string>(TOP_PROS[0]);
   const [result, setResult] = useState<ChainResult | null>(null);
   const [chainKey, setChainKey] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -46,9 +31,7 @@ function SixDegreesContent() {
     setPlayer(p);
 
     try {
-      const res = await fetch(
-        `/api/six-degrees?player=${p.slug}&target=${encodeURIComponent(targetPro)}`
-      );
+      const res = await fetch(`/api/six-degrees?player=${p.slug}`);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setResult(data.result ?? null);
@@ -74,7 +57,7 @@ function SixDegreesContent() {
     <div className="max-w-4xl mx-auto px-4 py-10">
       <h1 className="text-3xl font-bold text-sand-100 mb-1">Six Degrees</h1>
       <p className="text-court-400 mb-8 text-sm">
-        Trace the shortest chain of wins connecting any player to a top AVP pro
+        Trace the shortest chain of wins connecting any player to Miles Partain
       </p>
 
       <div className="card p-6 mb-8">
@@ -88,23 +71,6 @@ function SixDegreesContent() {
               placeholder="Search player..."
               initialSlug={params.get("player") ?? undefined}
             />
-          </div>
-
-          <div className="md:w-64">
-            <label className="block text-sand-400 text-xs uppercase tracking-wider mb-2">
-              Target Pro
-            </label>
-            <select
-              value={targetPro}
-              onChange={(e) => setTargetPro(e.target.value)}
-              className="input-field"
-            >
-              {TOP_PROS.map((pro) => (
-                <option key={pro} value={pro}>
-                  {pro}
-                </option>
-              ))}
-            </select>
           </div>
 
           <div className="flex items-end">
@@ -143,7 +109,7 @@ function SixDegreesContent() {
           <div className="text-4xl mb-4">🏐</div>
           <div className="text-sand-300 font-medium mb-2">No chain found</div>
           <p className="text-court-400 text-sm">
-            No win path could be traced to {targetPro}.<br />
+            No win path could be traced to Miles Partain.<br />
             Try more tournament data or a different target pro.
           </p>
         </div>

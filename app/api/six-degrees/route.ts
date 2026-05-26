@@ -3,13 +3,14 @@ import { supabase } from "@/lib/supabase";
 import { buildGraph, findShortestChain } from "@/lib/graph";
 import type { Player, Match } from "@/types";
 
+const MILES_PARTAIN_ID = "1644";
+
 export async function GET(req: NextRequest) {
   const playerSlug = req.nextUrl.searchParams.get("player");
-  const targetName = req.nextUrl.searchParams.get("target");
 
-  if (!playerSlug || !targetName) {
+  if (!playerSlug) {
     return NextResponse.json(
-      { error: "Missing player or target param" },
+      { error: "Missing player param" },
       { status: 400 }
     );
   }
@@ -26,20 +27,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Player not found" }, { status: 404 });
   }
 
-  // Fetch target pro(s) by name
-  const { data: targetRows } = await supabase
-    .from("players")
-    .select("*")
-    .ilike("name", `%${targetName}%`)
-    .limit(5);
-
-  const targetIds = new Set<string>(
-    (targetRows ?? []).map((p: Player) => p.id)
-  );
-
-  if (targetIds.size === 0) {
-    return NextResponse.json({ result: null });
-  }
+  const targetIds = new Set<string>([MILES_PARTAIN_ID]);
 
   // Fetch all matches (BFS needs the full graph — limit 50k rows)
   const { data: allMatches, error: mErr } = await supabase
