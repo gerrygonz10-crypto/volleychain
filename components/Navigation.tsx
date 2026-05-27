@@ -8,6 +8,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/six-degrees", label: "Six Degrees" },
+  { href: "/players/miles-partain", label: "Miles Partain" },
 ];
 
 export default function Navigation() {

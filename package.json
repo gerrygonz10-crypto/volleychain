@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "scrape": "tsx scripts/scrape.mts"
+    "scrape": "tsx scripts/scrape.mts",
+    "scrape:bfs": "tsx scripts/scrape-bfs.mts",
+    "scrape:miles": "tsx scripts/scrape-miles-profile.mts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.0",
