@@ -11,12 +11,15 @@ create table if not exists public.tournament_results (
   finish           integer,
   partner_ids      text[],
   partner_names    text[],
+  points           numeric not null default 0,
+  sanctioning_body text,
   created_at       timestamptz not null default now()
 );
 
 create index if not exists tr_player_idx on public.tournament_results (player_id);
 create index if not exists tr_date_idx   on public.tournament_results (tournament_date desc);
 create index if not exists tr_finish_idx on public.tournament_results (finish);
+create index if not exists tr_points_idx on public.tournament_results (points desc);
 
 -- Partnerships: one row per (player, partner, division) — directional, deduped by canonical ordering
 create table if not exists public.partnerships (

@@ -9,6 +9,8 @@ interface TournamentResult {
   division: string;
   finish: number | null;
   partner_names: string[];
+  points: number;
+  sanctioning_body: string | null;
 }
 
 interface Partnership {
@@ -81,6 +83,19 @@ function finishBadge(finish: number | null) {
       {finish}th
     </span>
   );
+}
+
+function sanctionBadge(body: string | null, name: string) {
+  const isFivb = name.toLowerCase().includes("fivb") || name.toLowerCase().includes("olympic") || name.toLowerCase().includes("bpt");
+  const isAvp  = body === "AVPA" || body === "AVP Next";
+  const isUsav = body === "USAV";
+  if (isFivb)
+    return <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25 shrink-0">FIVB</span>;
+  if (isAvp)
+    return <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gold-500/15 text-gold-400 border border-gold-500/25 shrink-0">AVP</span>;
+  if (isUsav)
+    return <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-court-600 text-court-400 border border-court-500 shrink-0">USAV</span>;
+  return null;
 }
 
 function StatBox({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -194,11 +209,20 @@ export default function MilesPartainPage() {
                 className="flex items-start gap-3 py-2.5 border-b border-court-700 last:border-0"
               >
                 <div className="flex-1 min-w-0">
-                  <div className="text-sand-200 text-sm font-medium truncate">{r.tournament_name}</div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {sanctionBadge(r.sanctioning_body, r.tournament_name)}
+                    <span className="text-sand-200 text-sm font-medium">{r.tournament_name}</span>
+                  </div>
                   <div className="text-court-400 text-xs mt-0.5 flex items-center gap-2">
                     <span>{r.tournament_date ? new Date(r.tournament_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</span>
                     {r.division && <span className="text-court-600">·</span>}
                     {r.division && <span>{r.division}</span>}
+                    {r.points > 0 && (
+                      <>
+                        <span className="text-court-600">·</span>
+                        <span className="text-court-400">{r.points.toLocaleString()} pts</span>
+                      </>
+                    )}
                   </div>
                   {r.partner_names?.length > 0 && (
                     <div className="text-court-500 text-xs mt-0.5">

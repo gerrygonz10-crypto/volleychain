@@ -18,6 +18,7 @@ export async function GET() {
       .from("tournament_results")
       .select("*")
       .eq("player_id", MILES_ID)
+      .order("points", { ascending: false })
       .order("tournament_date", { ascending: false }),
 
     db

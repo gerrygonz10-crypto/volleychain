@@ -29,7 +29,8 @@ async function apiGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-interface VBLFinish { id: number; tdId: number; tournament: string; date: string; division: string; finish: number; }
+interface VBLPoints { total: number; system: string; short: string; }
+interface VBLFinish { id: number; tdId: number; tournament: string; date: string; division: string; finish: number; sanctioningBodyId?: string; points?: VBLPoints[]; }
 interface VBLProfile { id: number; firstName: string; lastName: string; tournaments: VBLFinish[]; }
 interface VBLTeamPlayer { playerProfileId: number; name: string; }
 interface VBLTeam { id: number; players: VBLTeamPlayer[]; }
@@ -45,6 +46,7 @@ interface TournamentResult {
   id: string; player_id: string; tournament_id: string; tournament_name: string;
   tournament_date: string | null; division: string; finish: number | null;
   partner_ids: string[]; partner_names: string[];
+  points: number; sanctioning_body: string | null;
 }
 interface Partnership {
   id: string; player_a_id: string; player_b_id: string;
@@ -108,6 +110,7 @@ for (const finish of profile.tournaments ?? []) {
   const uniquePartners = [...new Map(allPartners.map(p => [p.playerProfileId, p])).values()];
 
   // One tournament result per division (merged partner list)
+  const maxPoints = Math.max(0, ...(finish.points ?? []).map(p => p.total));
   tournamentResults.push({
     id: `${SLUG}-${finish.tdId}`,
     player_id: SLUG,
@@ -118,6 +121,8 @@ for (const finish of profile.tournaments ?? []) {
     finish: finish.finish ?? null,
     partner_ids: uniquePartners.map(p => String(p.playerProfileId)),
     partner_names: uniquePartners.map(p => p.name),
+    points: maxPoints,
+    sanctioning_body: finish.sanctioningBodyId ?? null,
   });
 
   // Partnerships
